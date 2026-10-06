@@ -1,6 +1,7 @@
 SONGS ?= examples/*.mp3
 ARGS ?=
 RUN := uv run --frozen pilights
+RUN_PI := uv run --frozen --extra pi pilights
 
 .PHONY: help install install-pi lock test analyze play gui wiring wiring-gui clean
 
@@ -23,13 +24,13 @@ analyze: ## Make sequence files for SONGS
 	$(RUN) analyze $(SONGS) $(ARGS)
 
 play: ## Play SONGS in a loop on the GPIO pins (Pi)
-	$(RUN) play $(SONGS) --loop $(ARGS)
+	$(RUN_PI) play $(SONGS) --loop $(ARGS)
 
 gui: ## Play SONGS in a desktop window
 	$(RUN) play $(SONGS) --gui $(ARGS)
 
 wiring: ## Turn on each GPIO channel in turn (Pi)
-	$(RUN) test $(ARGS)
+	$(RUN_PI) test $(ARGS)
 
 wiring-gui: ## Turn on each channel in turn in a desktop window
 	$(RUN) test --gui $(ARGS)
