@@ -40,8 +40,10 @@ You can do the analysis on a different computer (it is faster). Copy the
 
 ## Wiring
 
-Default BCM pins, channel 0 first: `17,18,27,22,23,24,25,4`
-(physical pins 11, 12, 13, 15, 16, 18, 22, 7).
+Default BCM pins, channel 0 first: `14,15,18,17,27,22,23,24`
+(physical pins 8, 10, 12, 11, 13, 15, 16, 18). The maximum is 8 channels.
+GPIO14 and GPIO15 also serve the UART. Disable the serial console and UART
+if they use these pins before you connect the relay board.
 
 > **WARNING:** Do not connect mains voltage to the Pi. Use a relay board or
 > solid-state relays (SSRs) between the GPIO pins and the lights. Most

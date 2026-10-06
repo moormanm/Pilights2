@@ -31,7 +31,7 @@ from pathlib import Path
 
 FORMAT = "pilights-seq"
 VERSION = 1
-MAX_CHANNELS = 16
+MAX_CHANNELS = 8
 
 
 @dataclass

@@ -199,7 +199,7 @@ def main(argv=None) -> int:
     a.add_argument("--mode", choices=MODES, default=D.mode,
                    help="melody: bass, melody and treble channels (default); onset: pulses on note "
                         "attacks; energy: band loudness")
-    a.add_argument("--channels", type=int, default=D.channels)
+    a.add_argument("--channels", type=int, choices=range(1, 9), default=D.channels)
     a.add_argument("--sensitivity", type=float, default=D.sensitivity,
                    help="melody/onset: higher = more pulses (default %(default)s)")
     a.add_argument("--pulse", type=float, default=D.pulse,

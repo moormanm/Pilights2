@@ -182,6 +182,16 @@ class AudioInputsTest(unittest.TestCase):
 
 
 class SequenceTest(unittest.TestCase):
+    def test_channel_limit_and_default_pin_mapping(self):
+        from pilights.outputs import DEFAULT_PINS, Output
+
+        self.assertEqual(DEFAULT_PINS, (14, 15, 18, 17, 27, 22, 23, 24))
+        self.assertEqual(Output.channels, 8)
+        Sequence(channels=8, duration_ms=10, events=[(0, 255)]).validate()
+        for channels in (9, 16):
+            with self.assertRaisesRegex(ValueError, "channels must be 1..8"):
+                Sequence(channels=channels, duration_ms=10).validate()
+
     def test_round_trip(self):
         seq = Sequence(channels=8, duration_ms=1000, events=[(0, 0), (100, 255), (900, 0)], audio_sha256="ab")
         with tempfile.TemporaryDirectory() as d:

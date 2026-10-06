@@ -41,7 +41,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .sequence import Sequence, file_sha256
+from .sequence import MAX_CHANNELS, Sequence, file_sha256
 
 MODES = ("melody", "onset", "energy")
 
@@ -645,6 +645,8 @@ def _onset_states(samples: np.ndarray, p: AnalyzeParams, info: dict) -> tuple[np
 
 def analyze_samples(samples: np.ndarray, p: AnalyzeParams, info: dict | None = None) -> tuple[list, int, np.ndarray]:
     """Return (events, duration_ms, states[n_frames, channels]). Fills info with statistics."""
+    if not 1 <= p.channels <= MAX_CHANNELS:
+        raise ValueError(f"channels must be 1..{MAX_CHANNELS}, got {p.channels}")
     if p.mode not in MODES:
         raise ValueError(f"mode must be one of {', '.join(MODES)}")
     info = {} if info is None else info

@@ -4,13 +4,12 @@ from __future__ import annotations
 
 import sys
 
-# BCM pin numbers. These 8 pins are free on a Pi 3 header (physical pins
-# 11, 12, 13, 15, 16, 18, 22, 7).
-DEFAULT_PINS = (17, 18, 27, 22, 23, 24, 25, 4,28,29,30,31,32,33,34,35)
+# BCM pin numbers, in channel order (physical pins 8, 10, 12, 11, 13, 15, 16, 18).
+DEFAULT_PINS = (14, 15, 18, 17, 27, 22, 23, 24)
 
 
 class Output:
-    channels = 16
+    channels = 8
 
     def set_mask(self, mask: int) -> None:
         raise NotImplementedError
