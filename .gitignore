@@ -1,0 +1,6 @@
+examples
+halloween
+**/__pycache__/**
+.gitignore
+.DS_Store
+

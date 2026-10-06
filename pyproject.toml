@@ -1,0 +1,30 @@
+[project]
+name = "pilights"
+version = "1.0.0"
+description = "Sync 8 channels of Christmas lights to MP3 files on a Raspberry Pi"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.22",
+    "sounddevice>=0.4.6",
+]
+
+[project.optional-dependencies]
+pi = [
+    "gpiozero>=2.0",
+    "lgpio>=0.2.2; sys_platform == 'linux'",
+]
+
+[project.scripts]
+pilights = "pilights.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.11,<0.12"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = ""
+
+[tool.uv]
+# uv-managed Python includes Tkinter (for --gui) on macOS and Linux.
+python-preference = "only-managed"
