@@ -241,6 +241,25 @@ class RegenerateTest(unittest.TestCase):
         self.assertEqual(seq.channels, 6)
         self.assertEqual(seq.meta["options"]["sensitivity"], 1.5)
 
+    def test_too_many_channel_sequence_is_made_again_with_current_channel_count(self):
+        from pilights.cli import _check_sequence
+
+        data = {
+            "format": "pilights-seq",
+            "version": 1,
+            "analyzer_version": ANALYZER_VERSION,
+            "channels": 16,
+            "duration_ms": 1000,
+            "audio_sha256": "",
+            "meta": {"options": {"sensitivity": 1.5}},
+            "events": [[0, 0], [500, 65535], [1000, 0]],
+        }
+        self.seq.write_text(json.dumps(data))
+        seq = _check_sequence(self.audio, self.seq, 8)
+        self.assertEqual(seq.channels, 8)
+        self.assertEqual(seq.analyzer_version, ANALYZER_VERSION)
+        self.assertEqual(seq.meta["options"]["sensitivity"], 1.5)
+
     def test_current_version_is_kept(self):
         self.check()
         mtime = self.seq.stat().st_mtime_ns

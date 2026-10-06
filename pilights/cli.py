@@ -10,6 +10,7 @@ Add --gui (desktop window) or --console (terminal) to play or test without GPIO.
 from __future__ import annotations
 
 import argparse
+import json
 import signal
 import sys
 import time
@@ -72,11 +73,23 @@ def _analyze_one(audio, out: Path, p):
 def _check_sequence(audio, seq_path: Path, channels: int):
     """Load the sequence. Analyze again if it is missing, from an older analyzer, or from other audio."""
     from .analyze import ANALYZER_VERSION, params_from_options
-    from .sequence import Sequence, file_sha256
+    from .sequence import MAX_CHANNELS, Sequence, file_sha256
 
     if not seq_path.exists():
         print(f"{seq_path} not found; analyzing {audio} with default settings", file=sys.stderr)
         return _analyze_one(audio, seq_path, params_from_options({}, channels))
+    data = json.loads(seq_path.read_text())
+    old_channels = data.get("channels", 0)
+    if isinstance(old_channels, int) and old_channels > MAX_CHANNELS:
+        meta = data.get("meta", {})
+        made_by_pilights = data.get("analyzer_version", 0) > 0 or "params" in meta
+        if not made_by_pilights:
+            raise ValueError(f"{seq_path}: has {old_channels} channels; this version supports at most "
+                             f"{MAX_CHANNELS}. Regenerate it or use a sequence with 8 channels or fewer.")
+        options = meta.get("options", meta.get("params", {}))
+        print(f"{seq_path}: has {old_channels} channels; analyzing {audio} again with {channels} channels",
+              file=sys.stderr)
+        return _analyze_one(audio, seq_path, params_from_options(options, channels))
     seq = Sequence.load(seq_path)
     changed = bool(seq.audio_sha256) and seq.audio_sha256 != file_sha256(audio)
     if not seq.made_by_pilights:
