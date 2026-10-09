@@ -82,14 +82,54 @@ The `--gui` window shows one lamp for each channel, its GPIO pin, and the pin
 level (`HIGH`/`LOW`, with `--active-low` applied), plus the song position.
 Close the window or push Ctrl+C to stop.
 
+## ELEGOO remote
+
+Connect the ELEGOO IR receiver `OUT` pin to BCM GPIO 25, `GND` to ground, and
+`VCC` to 3.3 V. GPIO25 is not used by the default light outputs. Enable remote
+control with `--remote`:
+
+```sh
+make play ARGS="--active-low --remote"
+uv run pilights play song1.mp3 song2.mp3 --loop --remote
+```
+
+Power reboots the Raspberry Pi, play/pause toggles playback, forward skips to
+the next song, and back goes to the previous song. Song navigation wraps at
+the ends of the playlist. Use `--remote-pin` to select a different BCM input
+pin. Do not select a pin used by a light output.
+
+To test the receiver without controlling playback or rebooting, run:
+
+```sh
+make remote-test
+```
+
+Press Power, Play/Pause, Forward, or Back. The program prints the detected
+button. Use `make remote-test ARGS="--pin 23"` to select a different BCM input pin.
+
+The power button needs permission to reboot without a password. For the
+`pi` account used by the systemd service below, configure the sudo rule with:
+
+```sh
+make remote-sudo
+```
+
+This installs `/etc/sudoers.d/pilights-remote`. Check that `systemctl` is at
+`/usr/bin/systemctl` with `command -v systemctl`. If the service runs as a
+different user or `systemctl` is in another location, update
+`config/pilights-remote.sudoers` before running the target.
+
 Useful `play` options:
 
 | Option | Function |
 |---|---|
+| `--remote` | Enable the ELEGOO infrared remote |
+| `--remote-pin 25` | BCM pin for the IR receiver (default 25) |
 | `--pins 5,6,13,...` | Use different BCM pins (1 to 8 pins) |
 | `--offset-ms 120` | Delay the lights more, if the device does not report all of its latency (some Bluetooth speakers). A negative value makes the lights earlier. |
 | `--device 2` or `--device USB` | Select the audio output device, by number or part of the name. `uv run python -m sounddevice` shows the list. |
-| `--player mpg123` | Play with `mpg123` (`sudo apt install mpg123`). The light clock cannot include the output latency after the `mpg123` buffer, so the lights can be early. |
+| `--player portaudio` | Use PortAudio. This is the default and gives the best sync. |
+| `--player mpg123` | Use mpg123 instead. Its light clock may need `--offset-ms` to match audio output latency. Install with `sudo apt install mpg123`. |
 | `--mpg123-args "-a hw:1,0"` | Send options to `mpg123`, for example to select the audio device |
 
 ## Tuning the analysis

@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import queue
 import signal
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -122,6 +124,14 @@ def _audio_inputs(paths):
     return audio
 
 
+def _reboot_system() -> None:
+    try:
+        subprocess.run(["sudo", "-n", "systemctl", "--force", "reboot"], check=True)
+    except (OSError, subprocess.CalledProcessError) as e:
+        print(f"error: remote reboot failed: {e}; configure passwordless sudo for systemctl reboot",
+              file=sys.stderr)
+
+
 def cmd_analyze(args) -> int:
     from .analyze import AnalyzeParams
     from .sequence import default_sequence_path
@@ -158,25 +168,80 @@ def cmd_play(args) -> int:
             return 2
         songs.append((audio, _check_sequence(audio, seq_path, len(args.pins))))
 
+    if args.remote and args.remote_pin in args.pins:
+        raise RuntimeError(f"remote pin {args.remote_pin} is also used for a light output")
     out = _make_output(args)
     if args.player == "mpg123":
         player = Mpg123(extra_args=args.mpg123_args.split() if args.mpg123_args else ())
     else:
         player = PortAudioPlayer(int(args.device) if args.device and args.device.isdigit() else args.device)
+    commands = queue.Queue()
+    remote = None
+    if args.remote:
+        from .remote import IRRemote
+
+        try:
+            remote = IRRemote(args.remote_pin, commands.put)
+        except Exception:
+            out.close()
+            player.close()
+            raise
 
     def work(stop):
+        index = 0
         while not stop.is_set():
-            for audio, seq in songs:
-                print(f"Playing {audio}", file=sys.stderr)
-                play_song(player, audio, seq, out, offset_ms=args.offset_ms, stop=stop)
-                if stop.wait(args.gap) if args.gap > 0 else stop.is_set():
-                    return
-            if not args.loop:
+            audio, seq = songs[index]
+            print(f"Playing {audio}", file=sys.stderr)
+            command = play_song(player, audio, seq, out, offset_ms=args.offset_ms, stop=stop, commands=commands)
+            if command == "reboot":
+                _reboot_system()
                 return
+            if command == "next":
+                index = (index + 1) % len(songs)
+                continue
+            if command == "previous":
+                index = (index - 1) % len(songs)
+                continue
+            if stop.is_set():
+                return
+            index += 1
+            if index == len(songs):
+                if not args.loop:
+                    return
+                index = 0
+            deadline = time.monotonic() + args.gap
+            paused_gap_remaining = 0.0
+            gap_paused = False
+            while args.gap > 0 and not stop.is_set() and (gap_paused or time.monotonic() < deadline):
+                remaining = deadline - time.monotonic()
+                if not gap_paused and remaining <= 0:
+                    break
+                try:
+                    gap_command = commands.get(timeout=0.1 if gap_paused else min(remaining, 0.1))
+                except queue.Empty:
+                    continue
+                if gap_command == "reboot":
+                    _reboot_system()
+                    return
+                elif gap_command == "pause":
+                    if gap_paused:
+                        gap_paused = False
+                        deadline = time.monotonic() + paused_gap_remaining
+                    else:
+                        gap_paused = True
+                        paused_gap_remaining = max(0.0, deadline - time.monotonic())
+                elif gap_command == "next":
+                    index = (index + 1) % len(songs)
+                    break
+                elif gap_command == "previous":
+                    index = (index - 1) % len(songs)
+                    break
 
     try:
         _run(out, work)
     finally:
+        if remote is not None:
+            remote.close()
         player.close()
     return 0
 
@@ -248,9 +313,11 @@ def main(argv=None) -> int:
     p.add_argument("--offset-ms", type=float, default=0.0,
                    help="delay lights by this many ms (use to match audio output latency)")
     p.add_argument("--player", choices=("portaudio", "mpg123"), default="portaudio",
-                   help="audio player (default %(default)s; portaudio includes the output latency in the light clock)")
+                   help="audio player (default %(default)s; best sync)")
     p.add_argument("--device", help="portaudio output device, number or part of the name (see: python -m sounddevice)")
     p.add_argument("--mpg123-args", default="", help='extra mpg123 options, e.g. "-a hw:0,0"')
+    p.add_argument("--remote", action="store_true", help="enable an ELEGOO NEC infrared remote")
+    p.add_argument("--remote-pin", type=int, default=25, help="BCM input pin for the remote receiver (default 25)")
     add_output_args(p)
     p.set_defaults(func=cmd_play)
 

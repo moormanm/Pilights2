@@ -40,6 +40,7 @@ class Mpg123:
         self._at = 0.0
         self._first = None
         self._lead = None
+        self._paused_position = None
         self.error = None
         self.started = threading.Event()
         self.finished = threading.Event()
@@ -83,6 +84,7 @@ class Mpg123:
             self._pos = None
             self._first = None
             self._lead = None
+            self._paused_position = None
         self.error = None
         self.started.clear()
         self.finished.clear()
@@ -93,11 +95,24 @@ class Mpg123:
         with self._lock:
             if self._pos is None:
                 return None
+            if self._paused_position is not None:
+                return self._paused_position
             # Limit interpolation so a stall does not run the lights ahead.
             return max(0.0, self._pos + min(time.monotonic() - self._at, 0.1) - self._lead)
 
     def stop(self) -> None:
         self._send("STOP")
+
+    def pause(self) -> None:
+        position = self.position()
+        with self._lock:
+            self._paused_position = position
+        self._send("PAUSE")
+
+    def resume(self) -> None:
+        self._send("PAUSE")
+        with self._lock:
+            self._paused_position = None
 
     def close(self) -> None:
         try:
@@ -130,6 +145,7 @@ class PortAudioPlayer:
         self._stream = None
         self._ffmpeg = None
         self._pos = None
+        self._paused_position = None
         self.error = None
         self.started = threading.Event()
         self.finished = threading.Event()
@@ -152,7 +168,8 @@ class PortAudioPlayer:
         self._close_stream()
         with self._lock:
             self._pos = None
-        self.error = None
+            self._paused_position = None
+            self.error = None
         self.started.clear()
         self.finished.clear()
         cmd = ["ffmpeg", "-v", "error", "-nostdin", "-i", str(path), "-f", "f32le", "-acodec", "pcm_f32le",
@@ -163,6 +180,11 @@ class PortAudioPlayer:
         state = {"buf": np.zeros((0, self.channels), np.float32), "frames": 0, "eof": False}
 
         def callback(outdata, frames, t, status):
+            with self._lock:
+                paused = self._paused_position is not None
+            if paused:
+                outdata.fill(0)
+                return
             buf = state["buf"]
             while len(buf) < frames and not state["eof"]:
                 try:
@@ -196,8 +218,22 @@ class PortAudioPlayer:
         with self._lock:
             if self._pos is None or self._stream is None:
                 return None
+            if self._paused_position is not None:
+                return self._paused_position
             frames, dac = self._pos
             return max(0.0, frames / self.rate + min(self._stream.time - dac, 0.2))
+
+    def pause(self) -> None:
+        if self._stream is not None and self._paused_position is None:
+            with self._lock:
+                if self._pos is not None:
+                    frames, dac = self._pos
+                    self._paused_position = max(0.0, frames / self.rate + min(self._stream.time - dac, 0.2))
+
+    def resume(self) -> None:
+        if self._stream is not None and self._paused_position is not None:
+            with self._lock:
+                self._paused_position = None
 
     def stop(self) -> None:
         if self._stream is not None:
@@ -219,8 +255,8 @@ class PortAudioPlayer:
 
 
 def play_song(player: Mpg123, audio: str | Path, seq: Sequence, out: Output, offset_ms: float = 0.0,
-              stop: threading.Event | None = None) -> None:
-    """Play one song and run its sequence. offset_ms > 0 delays the lights."""
+              stop: threading.Event | None = None, commands: queue.Queue | None = None) -> str:
+    """Play one song and run its sequence. Return a remote playlist command if one was received."""
     events = seq.events
     out.set_mask(0)
     player.load(audio)
@@ -229,11 +265,37 @@ def play_song(player: Mpg123, audio: str | Path, seq: Sequence, out: Output, off
     if player.error:
         raise RuntimeError(f"{audio}: {player.error}")
     idx = 0
+    paused = False
+    current_mask = 0
     name = Path(audio).name
     while not player.finished.is_set():
         if stop is not None and stop.is_set():
             player.stop()
             break
+        if commands is not None:
+            try:
+                command = commands.get_nowait()
+            except queue.Empty:
+                command = None
+            if command == "pause":
+                if paused:
+                    player.resume()
+                    paused = False
+                else:
+                    player.pause()
+                    paused = True
+                out.set_mask(current_mask if not paused else 0)
+            elif command in ("next", "previous"):
+                player.stop()
+                out.set_mask(0)
+                return command
+            elif command == "reboot":
+                player.stop()
+                out.set_mask(0)
+                return command
+        if paused:
+            time.sleep(0.02)
+            continue
         pos = player.position()
         if pos is None:
             time.sleep(0.005)
@@ -245,9 +307,11 @@ def play_song(player: Mpg123, audio: str | Path, seq: Sequence, out: Output, off
             mask = events[idx][1]
             idx += 1
         if mask is not None:
-            out.set_mask(mask)
+            current_mask = mask
+            out.set_mask(current_mask)
         wait = (events[idx][0] - t_ms) / 1000.0 if idx < len(events) else 0.05
         time.sleep(min(max(wait, 0.001), 0.005))
     if player.error:
         raise RuntimeError(f"{audio}: {player.error}")
     out.set_mask(0)
+    return "finished"

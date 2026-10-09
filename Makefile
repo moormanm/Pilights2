@@ -3,7 +3,7 @@ ARGS ?=
 RUN := uv run --frozen pilights
 RUN_PI := uv run --frozen --extra pi pilights
 
-.PHONY: help install install-pi lock test analyze play gui wiring wiring-gui clean
+.PHONY: help install install-pi lock test analyze play gui wiring wiring-gui remote-test remote-sudo clean
 
 help: ## Show this help
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-12s %s\n", $$1, $$2}'
@@ -34,6 +34,13 @@ wiring: ## Turn on each GPIO channel in turn (Pi)
 
 wiring-gui: ## Turn on each channel in turn in a desktop window
 	$(RUN) test --gui $(ARGS)
+
+remote-test: ## Test the ELEGOO remote buttons on the Pi
+	uv run --frozen --extra pi python -m scripts.test_remote $(ARGS)
+
+remote-sudo: ## Allow the pi user to reboot from the ELEGOO remote
+	sudo install -o root -g root -m 0440 config/pilights-remote.sudoers /etc/sudoers.d/pilights-remote
+	sudo visudo -c
 
 clean: ## Remove the virtual environment, caches and sequence files in examples/
 	rm -rf .venv build dist *.egg-info
