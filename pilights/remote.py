@@ -11,13 +11,19 @@ KEY_COMMANDS = {
     164: "pause",        # KEY_PLAYPAUSE
     163: "next",         # KEY_NEXTSONG
     165: "previous",     # KEY_PREVIOUSSONG
+    115: "volume_up",    # KEY_VOLUMEUP
+    114: "volume_down",  # KEY_VOLUMEDOWN
 }
+
+REPEAT_COMMANDS = {"volume_up", "volume_down"}
 
 KEY_NAMES = {
     148: "KEY_PROG1",
     164: "KEY_PLAYPAUSE",
     163: "KEY_NEXTSONG",
     165: "KEY_PREVIOUSSONG",
+    115: "KEY_VOLUMEUP",
+    114: "KEY_VOLUMEDOWN",
 }
 
 
@@ -77,7 +83,7 @@ class IRRemote:
         if command is None:
             return
         now = time.monotonic()
-        if command == self._last_command and now - self._last_command_at < 0.3:
+        if command == self._last_command and now - self._last_command_at < (0.15 if command in REPEAT_COMMANDS else 0.3):
             return
         self._last_command = command
         self._last_command_at = now
@@ -88,9 +94,10 @@ class IRRemote:
             for event in self.device.read_loop():
                 if self._stop.is_set():
                     return
-                if event.type == self._evdev.ecodes.EV_KEY and event.value == 1:
+                if event.type == self._evdev.ecodes.EV_KEY and event.value in (1, 2):
                     command = command_for_key(event.code)
-                    self._emit(event.code, command)
+                    if event.value == 1 or command in REPEAT_COMMANDS:
+                        self._emit(event.code, command)
         except OSError:
             if not self._stop.is_set():
                 raise

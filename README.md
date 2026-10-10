@@ -130,7 +130,8 @@ uv run pilights play song1.mp3 song2.mp3 --loop --remote
 ```
 
 Power reboots the Raspberry Pi, play/pause toggles playback, forward skips to
-the next song, and back goes to the previous song. Song navigation wraps at
+the next song, and back goes to the previous song. Volume + and - change the default
+PipeWire volume by 5%, which also sets the Bluetooth speaker volume. Song navigation wraps at
 the ends of the playlist. The service user must have permission to read the
 selected `/dev/input/event*` device.
 

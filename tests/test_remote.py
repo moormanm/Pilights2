@@ -19,6 +19,8 @@ class EvdevRemoteTest(unittest.TestCase):
         for code, command in expected.items():
             with self.subTest(command=command):
                 self.assertEqual(command_for_key(code), command)
+        self.assertEqual(command_for_key(115), "volume_up")
+        self.assertEqual(command_for_key(114), "volume_down")
         self.assertIsNone(command_for_key(30))
 
     def test_pause_toggles_then_next_stops_playback(self):

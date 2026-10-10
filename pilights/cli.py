@@ -124,6 +124,14 @@ def _audio_inputs(paths):
     return audio
 
 
+def _change_volume(command: str) -> None:
+    step = "5%+" if command == "volume_up" else "5%-"
+    try:
+        subprocess.run(["wpctl", "set-volume", "-l", "1.0", "@DEFAULT_AUDIO_SINK@", step], check=True)
+    except (OSError, subprocess.CalledProcessError) as e:
+        print(f"error: volume change failed: {e}", file=sys.stderr)
+
+
 def _reboot_system() -> None:
     try:
         subprocess.run(["sudo", "-n", "systemctl", "--force", "reboot"], check=True)
@@ -206,7 +214,8 @@ def cmd_play(args) -> int:
         from .remote import IRRemote
 
         try:
-            remote = IRRemote(commands.put, device_path=args.remote_device)
+            remote = IRRemote(lambda c: _change_volume(c) if c.startswith("volume") else commands.put(c),
+                              device_path=args.remote_device)
         except Exception:
             out.close()
             player.close()
