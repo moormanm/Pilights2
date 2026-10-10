@@ -1,0 +1,1 @@
+SUBSYSTEM=="input", KERNEL=="event*", ATTRS{name}=="gpio_ir_recv", GROUP="input", MODE="0660"

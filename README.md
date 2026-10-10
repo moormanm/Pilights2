@@ -85,42 +85,31 @@ Close the window or push Ctrl+C to stop.
 ## ELEGOO remote
 
 The remote uses Linux input events (`evdev`). Connect the IR receiver `OUT` pin
-to BCM GPIO 25 (physical pin 22), `GND` to ground, and `VCC` to 3.3 V. Add the
-GPIO IR overlay to the Pi boot config and reboot:
+to BCM GPIO 25 (physical pin 22), `GND` to ground, and `VCC` to 3.3 V. Configure
+the Pi with:
 
 ```sh
-make remote-config
+make remote-setup
 ```
 
-The target adds `dtoverlay=gpio-ir,gpio_pin=25` to
-`/boot/firmware/config.txt` if it is not already present. On systems that use a
-different config path, set it, for example:
+This installs `ir-keytable`, adds `dtoverlay=gpio-ir,gpio_pin=25` to the boot
+config, installs the ELEGOO key map and a service to load it at boot, and gives
+the `pi` user access to the IR input device and permission to reboot. It also
+installs the Pi Python dependencies. The target does not reboot the Pi. Reboot
+after it completes, then log in again so the input group change applies. The
+sudoers rule and input-group change use the `pi` account. If playback runs as
+another user, update those settings for that account. On systems that use a
+different boot config path, set it:
 
 ```sh
-make remote-config BOOT_CONFIG=/boot/config.txt
+make remote-setup BOOT_CONFIG=/boot/config.txt
 ```
 
-Install Pi dependencies and the IR tools:
-
-```sh
-make install-pi
-sudo apt install ir-keytable
-```
-
-Copy the provided key map and load it:
-
-```sh
-sudo install -D -m 0644 config/elegoo-21-keymap /etc/rc_keymaps/elegoo-21-keymap
-sudo ir-keytable -c -p nec -w /etc/rc_keymaps/elegoo-21-keymap
-```
-
-The key map is active until reboot. Use `sudo ir-keytable -t` to check the
-remote and confirm that its scancodes match the map. If they differ, edit the
-map with the scancodes shown by that command, then load it again. Check the
-input device with `make remote-test`; if needed, select it with
+Use `sudo ir-keytable -t` to check the remote and confirm that its scancodes
+match the map. If they differ, edit `config/elegoo-21-keymap` to use the
+scancodes shown by that command, then run `make remote-setup` again. Check
+button events with `make remote-test`; if needed, select the input device with
 `make remote-test ARGS="--device /dev/input/event2"`.
-For automatic loading after reboot, configure the key map with the system's
-`rc_maps.cfg` rules.
 
 Enable control during playback with `--remote`:
 

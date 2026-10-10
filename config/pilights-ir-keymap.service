@@ -1,0 +1,11 @@
+[Unit]
+Description=Load the pilights ELEGOO infrared remote key map
+After=systemd-udev-trigger.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/ir-keytable -c -p nec -w /etc/rc_keymaps/elegoo-21-keymap
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
