@@ -54,7 +54,7 @@ remote-setup: install-pi remote-config remote-sudo ## Install and configure the 
 	sudo usermod -aG input pi
 	sudo systemctl daemon-reload
 	sudo systemctl enable pilights-ir-keymap.service
-	sudo systemctl restart pilights-ir-keymap.service
+	sudo systemctl restart pilights-ir-keymap.service || echo "IR receiver not found yet; reboot the Pi to activate it"
 	sudo udevadm control --reload-rules
 	@echo "Remote setup is complete. Reboot if the overlay was added; log in again if the input group membership changed."
 
