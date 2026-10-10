@@ -53,8 +53,9 @@ remote-setup: install-pi remote-config remote-sudo ## Install and configure the 
 	sudo usermod -aG input pi
 	sudo systemctl daemon-reload
 	sudo systemctl enable pilights-ir-keymap.service
+	sudo systemctl restart pilights-ir-keymap.service
 	sudo udevadm control --reload-rules
-	@echo "Remote setup is complete. Reboot the Pi, then log in again so the input group change applies."
+	@echo "Remote setup is complete. Reboot if the overlay was added; log in again if the input group membership changed."
 
 remote-test: ## Test the ELEGOO remote buttons on the Pi
 	uv run --frozen --extra pi python -m scripts.test_remote $(ARGS)

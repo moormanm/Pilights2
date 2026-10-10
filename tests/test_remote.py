@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 from queue import Queue
 from threading import Event
 from types import SimpleNamespace
@@ -9,6 +10,13 @@ from pilights.remote import IRRemote, command_for_key
 
 
 class EvdevRemoteTest(unittest.TestCase):
+    def test_elegoo_keymap_matches_button_scancodes(self):
+        keymap = (Path(__file__).parents[1] / "config/elegoo-21-keymap").read_text()
+        self.assertIn("0x2d KEY_POWER", keymap)
+        self.assertIn("0x28 KEY_PLAYPAUSE", keymap)
+        self.assertIn("0x2b KEY_NEXTSONG", keymap)
+        self.assertIn("0x2c KEY_PREVIOUSSONG", keymap)
+
     def test_maps_linux_remote_key_codes(self):
         expected = {
             116: "reboot",

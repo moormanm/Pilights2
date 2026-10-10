@@ -95,8 +95,9 @@ make remote-setup
 This installs `ir-keytable`, adds `dtoverlay=gpio-ir,gpio_pin=25` to the boot
 config, installs the ELEGOO key map and a service to load it at boot, and gives
 the `pi` user access to the IR input device and permission to reboot. It also
-installs the Pi Python dependencies. The target does not reboot the Pi. Reboot
-after it completes, then log in again so the input group change applies. The
+installs the Pi Python dependencies and restarts the key-map service to apply
+the map. Reboot if the GPIO overlay was just added, and log in again if the
+input group membership changed. The
 sudoers rule and input-group change use the `pi` account. If playback runs as
 another user, update those settings for that account. On systems that use a
 different boot config path, set it:
@@ -112,9 +113,10 @@ check the remote:
 sudo ir-keytable -s rc1 -p nec -t
 ```
 
-The `remote-setup` service loads the key map into `rc1` at boot. If the
-scancodes shown by `ir-keytable -s rc1 -t` differ from the entries in
-`config/elegoo-21-keymap`, update the map and run `make remote-setup` again.
+The supplied map matches the scancodes on the ELEGOO remote tested here:
+Power `0x2d`, Play/Pause `0x28`, Forward `0x2b`, and Back `0x2c`. The
+`remote-setup` service loads the map into `rc1` at boot. If your scancodes
+differ, update `config/elegoo-21-keymap` and run `make remote-setup` again.
 Check button events with `make remote-test`; if needed, select the input device
 with `make remote-test ARGS="--device /dev/input/event6"`.
 
