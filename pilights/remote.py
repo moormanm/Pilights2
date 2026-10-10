@@ -13,10 +13,14 @@ REMOTE_COMMANDS = {
 }
 
 
+def logical_code(code: int) -> int:
+    """Convert the decoder's least-significant-bit-first value to its displayed NEC code."""
+    return int.from_bytes(code.to_bytes(4, "little"), "big")
+
+
 def command_for_code(code: int) -> str | None:
     """Map a decoded NEC frame to a playback command."""
-    logical = int.from_bytes(code.to_bytes(4, "little"), "big")
-    return REMOTE_COMMANDS.get(logical)
+    return REMOTE_COMMANDS.get(logical_code(code))
 
 
 class NECDecoder:
@@ -68,7 +72,7 @@ class NECDecoder:
 class IRRemote:
     """Send decoded ELEGOO remote commands to a callback."""
 
-    def __init__(self, pin: int, on_command):
+    def __init__(self, pin: int, on_command, on_code=None, on_edge=None):
         try:
             import lgpio
         except ImportError as e:
@@ -76,6 +80,8 @@ class IRRemote:
 
         self._lgpio = lgpio
         self._on_command = on_command
+        self._on_code = on_code
+        self._on_edge = on_edge
         self._decoder = NECDecoder()
         self._last_command = None
         self._last_command_at = 0.0
@@ -93,8 +99,14 @@ class IRRemote:
             raise
 
     def _edge(self, chip, gpio, level, tick) -> None:
+        if self._on_edge is not None:
+            self._on_edge(level, tick)
         code = self._decoder.feed(level, tick)
-        command = command_for_code(code) if code is not None else None
+        if code is None:
+            return
+        command = command_for_code(code)
+        if self._on_code is not None:
+            self._on_code(logical_code(code), command)
         if command is None:
             return
         now = time.monotonic()

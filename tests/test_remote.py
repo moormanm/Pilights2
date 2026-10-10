@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from pilights.player import play_song
-from pilights.remote import IRRemote, NECDecoder, command_for_code
+from pilights.remote import IRRemote, NECDecoder, command_for_code, logical_code
 
 
 def decode_frame(logical_code):
@@ -44,6 +44,11 @@ class NECDecoderTest(unittest.TestCase):
         self.assertIsNone(command_for_code(0x12345678))
         self.assertIsNone(command_for_code(decode_frame(0x00FF629D)))
         self.assertIsNone(command_for_code(decode_frame(0x12FFA25D)))
+
+    def test_decodes_unknown_frames_for_diagnostics(self):
+        code = decode_frame(0x00FF629D)
+        self.assertEqual(logical_code(code), 0x00FF629D)
+        self.assertIsNone(command_for_code(code))
 
     def test_pause_toggles_then_next_stops_playback(self):
         class Player:

@@ -106,6 +106,8 @@ make remote-test
 
 Press Power, Play/Pause, Forward, or Back. The program prints the detected
 button. Use `make remote-test ARGS="--pin 23"` to select a different BCM input pin.
+The test also prints each decoded NEC code. Use `make remote-test ARGS="--edges"`
+to print every GPIO edge if it does not decode a code.
 
 The power button needs permission to reboot without a password. For the
 `pi` account used by the systemd service below, configure the sudo rule with:

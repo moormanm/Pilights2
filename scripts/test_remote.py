@@ -18,10 +18,23 @@ LABELS = {
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pin", type=int, default=25, help="BCM pin for the IR receiver (default 25)")
+    parser.add_argument("--edges", action="store_true", help="print every GPIO edge for signal troubleshooting")
     args = parser.parse_args()
 
+    def show_code(code, command):
+        label = LABELS.get(command, "unknown button")
+        print(f"NEC code 0x{code:08X}: {label}", flush=True)
+
+    def show_edge(level, tick):
+        print(f"GPIO edge: level={level} tick={tick}", flush=True)
+
     try:
-        remote = IRRemote(args.pin, lambda command: print(f"Detected: {LABELS[command]}", flush=True))
+        remote = IRRemote(
+            args.pin,
+            lambda command: print(f"Detected: {LABELS[command]}", flush=True),
+            on_code=show_code,
+            on_edge=show_edge if args.edges else None,
+        )
     except RuntimeError as error:
         parser.exit(1, f"error: {error}\n")
 
