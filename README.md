@@ -117,9 +117,8 @@ The supplied map matches the scancodes on the ELEGOO remote tested here:
 Power `0x45`, Play/Pause `0x40`, Forward `0x43`, and Back `0x44`. The
 `remote-setup` service loads the map into `rc1` at boot. If your scancodes
 differ, update `config/elegoo-21-keymap` and run `make remote-setup` again.
-The Pi reports these buttons as scan events. pilights maps the scans directly
-because this receiver may not emit Linux key events even when its kernel key
-map is loaded. Check button events with `make remote-test`; if needed, select the input device
+Power is mapped to `KEY_PROG1`, not `KEY_POWER`, because systemd-logind
+powers off the Pi on `KEY_POWER`. Check button events with `make remote-test`; if needed, select the input device
 with `make remote-test ARGS="--device /dev/input/event6"`.
 
 Enable control during playback with `--remote`:

@@ -7,39 +7,23 @@ import time
 
 
 KEY_COMMANDS = {
-    116: "reboot",       # KEY_POWER
+    148: "reboot",       # KEY_PROG1; logind ignores it, unlike KEY_POWER
     164: "pause",        # KEY_PLAYPAUSE
     163: "next",         # KEY_NEXTSONG
     165: "previous",     # KEY_PREVIOUSSONG
 }
 
-SCANCODE_COMMANDS = {
-    0x45: "reboot",
-    0x40: "pause",
-    0x43: "next",
-    0x44: "previous",
-}
-
 KEY_NAMES = {
-    116: "KEY_POWER",
+    148: "KEY_PROG1",
     164: "KEY_PLAYPAUSE",
     163: "KEY_NEXTSONG",
     165: "KEY_PREVIOUSSONG",
-    0x45: "Power",
-    0x40: "Play/Pause",
-    0x43: "Forward",
-    0x44: "Back",
 }
 
 
 def command_for_key(key_code: int) -> str | None:
     """Map a Linux input key code to a playback command."""
     return KEY_COMMANDS.get(key_code)
-
-
-def command_for_scancode(scancode: int) -> str | None:
-    """Map a Linux input scan code from MSC_SCAN to a playback command."""
-    return SCANCODE_COMMANDS.get(scancode)
 
 
 def find_remote_device():
@@ -104,10 +88,7 @@ class IRRemote:
             for event in self.device.read_loop():
                 if self._stop.is_set():
                     return
-                if event.type == self._evdev.ecodes.EV_MSC and event.code == self._evdev.ecodes.MSC_SCAN:
-                    command = command_for_scancode(event.value)
-                    self._emit(event.value, command)
-                elif event.type == self._evdev.ecodes.EV_KEY and event.value == 1:
+                if event.type == self._evdev.ecodes.EV_KEY and event.value == 1:
                     command = command_for_key(event.code)
                     self._emit(event.code, command)
         except OSError:

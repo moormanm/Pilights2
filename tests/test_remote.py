@@ -5,13 +5,13 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from pilights.player import play_song
-from pilights.remote import IRRemote, command_for_key, command_for_scancode
+from pilights.remote import IRRemote, command_for_key
 
 
 class EvdevRemoteTest(unittest.TestCase):
     def test_maps_linux_remote_key_codes(self):
         expected = {
-            116: "reboot",
+            148: "reboot",
             164: "pause",
             163: "next",
             165: "previous",
@@ -20,13 +20,6 @@ class EvdevRemoteTest(unittest.TestCase):
             with self.subTest(command=command):
                 self.assertEqual(command_for_key(code), command)
         self.assertIsNone(command_for_key(30))
-
-    def test_maps_remote_scancodes(self):
-        self.assertEqual(command_for_scancode(0x45), "reboot")
-        self.assertEqual(command_for_scancode(0x40), "pause")
-        self.assertEqual(command_for_scancode(0x43), "next")
-        self.assertEqual(command_for_scancode(0x44), "previous")
-        self.assertIsNone(command_for_scancode(0x10))
 
     def test_pause_toggles_then_next_stops_playback(self):
         class Player:
@@ -80,12 +73,10 @@ class EvdevRemoteTest(unittest.TestCase):
 
     def test_ir_remote_maps_only_key_down_events(self):
         events = [
-            SimpleNamespace(type=1, code=116, value=0),
-            SimpleNamespace(type=4, code=4, value=0x45),
-            SimpleNamespace(type=4, code=4, value=0x45),
-            SimpleNamespace(type=1, code=116, value=1),
-            SimpleNamespace(type=1, code=116, value=2),
-            SimpleNamespace(type=4, code=4, value=0x43),
+            SimpleNamespace(type=1, code=148, value=0),
+            SimpleNamespace(type=1, code=148, value=1),
+            SimpleNamespace(type=1, code=148, value=2),
+            SimpleNamespace(type=1, code=163, value=1),
             SimpleNamespace(type=1, code=30, value=1),
         ]
         device = SimpleNamespace(
@@ -106,11 +97,9 @@ class EvdevRemoteTest(unittest.TestCase):
             remote.close()
 
         self.assertEqual([call.args[0] for call in on_command.call_args_list], ["reboot", "next"])
-        self.assertEqual(on_key.call_args_list[0].args, (0x45, "reboot"))
-        self.assertEqual(on_key.call_args_list[1].args, (0x45, "reboot"))
-        self.assertEqual(on_key.call_args_list[2].args, (116, "reboot"))
-        self.assertEqual(on_key.call_args_list[3].args, (0x43, "next"))
-        self.assertEqual(on_key.call_args_list[4].args, (30, None))
+        self.assertEqual(on_key.call_args_list[0].args, (148, "reboot"))
+        self.assertEqual(on_key.call_args_list[1].args, (163, "next"))
+        self.assertEqual(on_key.call_args_list[2].args, (30, None))
 
 
 if __name__ == "__main__":
