@@ -1,9 +1,10 @@
 SONGS ?= examples/*.mp3
 ARGS ?=
+BOOT_CONFIG ?= /boot/firmware/config.txt
 RUN := uv run --frozen pilights
 RUN_PI := uv run --frozen --extra pi pilights
 
-.PHONY: help install install-pi lock test analyze play gui wiring wiring-gui remote-test remote-sudo clean
+.PHONY: help install install-pi lock test analyze play gui wiring wiring-gui remote-config remote-test remote-sudo clean
 
 help: ## Show this help
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-12s %s\n", $$1, $$2}'
@@ -34,6 +35,15 @@ wiring: ## Turn on each GPIO channel in turn (Pi)
 
 wiring-gui: ## Turn on each channel in turn in a desktop window
 	$(RUN) test --gui $(ARGS)
+
+remote-config: ## Enable the GPIO IR receiver overlay in the Pi boot config
+	@test -f "$(BOOT_CONFIG)" || { echo "Config file not found: $(BOOT_CONFIG). Set BOOT_CONFIG to the correct path." >&2; exit 1; }
+	@if sudo grep -Fqx 'dtoverlay=gpio-ir,gpio_pin=25' "$(BOOT_CONFIG)"; then \
+		echo "GPIO IR overlay is already enabled in $(BOOT_CONFIG)"; \
+	else \
+		printf '\n%s\n' 'dtoverlay=gpio-ir,gpio_pin=25' | sudo tee -a "$(BOOT_CONFIG)" >/dev/null; \
+		echo "Added GPIO IR overlay to $(BOOT_CONFIG); reboot the Pi to enable it"; \
+	fi
 
 remote-test: ## Test the ELEGOO remote buttons on the Pi
 	uv run --frozen --extra pi python -m scripts.test_remote $(ARGS)

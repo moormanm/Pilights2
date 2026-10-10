@@ -85,11 +85,19 @@ Close the window or push Ctrl+C to stop.
 ## ELEGOO remote
 
 The remote uses Linux input events (`evdev`). Connect the IR receiver `OUT` pin
-to BCM GPIO 25 (physical pin 22), `GND` to ground, and `VCC` to 3.3 V. Add this
-line to `/boot/firmware/config.txt`, then reboot:
+to BCM GPIO 25 (physical pin 22), `GND` to ground, and `VCC` to 3.3 V. Add the
+GPIO IR overlay to the Pi boot config and reboot:
 
 ```sh
-dtoverlay=gpio-ir,gpio_pin=25
+make remote-config
+```
+
+The target adds `dtoverlay=gpio-ir,gpio_pin=25` to
+`/boot/firmware/config.txt` if it is not already present. On systems that use a
+different config path, set it, for example:
+
+```sh
+make remote-config BOOT_CONFIG=/boot/config.txt
 ```
 
 Install Pi dependencies and the IR tools:
