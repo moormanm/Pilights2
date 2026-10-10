@@ -21,7 +21,7 @@ def main() -> int:
     args = parser.parse_args()
 
     def show_key(code, command):
-        name = KEY_NAMES.get(code, f"KEY_{code}")
+        name = KEY_NAMES.get(code, f"KEY_{code:#x}")
         label = LABELS.get(command, "unknown key")
         print(f"Detected {name}: {label}", flush=True)
 

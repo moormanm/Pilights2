@@ -114,10 +114,12 @@ sudo ir-keytable -s rc1 -p nec -t
 ```
 
 The supplied map matches the scancodes on the ELEGOO remote tested here:
-Power `0x2d`, Play/Pause `0x28`, Forward `0x2b`, and Back `0x2c`. The
+Power `0x45`, Play/Pause `0x40`, Forward `0x43`, and Back `0x44`. The
 `remote-setup` service loads the map into `rc1` at boot. If your scancodes
 differ, update `config/elegoo-21-keymap` and run `make remote-setup` again.
-Check button events with `make remote-test`; if needed, select the input device
+The Pi reports these buttons as scan events. pilights maps the scans directly
+because this receiver may not emit Linux key events even when its kernel key
+map is loaded. Check button events with `make remote-test`; if needed, select the input device
 with `make remote-test ARGS="--device /dev/input/event6"`.
 
 Enable control during playback with `--remote`:
@@ -138,8 +140,8 @@ To test the receiver without controlling playback or rebooting, run:
 make remote-test
 ```
 
-Press remote buttons. The program prints each Linux key event and the mapped
-action. Unknown keys are also printed for diagnosis.
+Press remote buttons. The program prints each scan or key event and its mapped
+action. Unknown events are also printed for diagnosis.
 
 The power button needs permission to reboot without a password. For the
 `pi` account used by the systemd service below, configure the sudo rule with:

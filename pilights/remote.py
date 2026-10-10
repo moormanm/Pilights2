@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+import time
 
 
 KEY_COMMANDS = {
@@ -12,17 +13,33 @@ KEY_COMMANDS = {
     165: "previous",     # KEY_PREVIOUSSONG
 }
 
+SCANCODE_COMMANDS = {
+    0x45: "reboot",
+    0x40: "pause",
+    0x43: "next",
+    0x44: "previous",
+}
+
 KEY_NAMES = {
     116: "KEY_POWER",
     164: "KEY_PLAYPAUSE",
     163: "KEY_NEXTSONG",
     165: "KEY_PREVIOUSSONG",
+    0x45: "Power",
+    0x40: "Play/Pause",
+    0x43: "Forward",
+    0x44: "Back",
 }
 
 
 def command_for_key(key_code: int) -> str | None:
     """Map a Linux input key code to a playback command."""
     return KEY_COMMANDS.get(key_code)
+
+
+def command_for_scancode(scancode: int) -> str | None:
+    """Map a Linux input scan code from MSC_SCAN to a playback command."""
+    return SCANCODE_COMMANDS.get(scancode)
 
 
 def find_remote_device():
@@ -65,21 +82,34 @@ class IRRemote:
         self._on_command = on_command
         self._on_key = on_key
         self._stop = threading.Event()
+        self._last_command = None
+        self._last_command_at = 0.0
         self._thread = threading.Thread(target=self._read, name="ir-remote", daemon=True)
         self._thread.start()
+
+    def _emit(self, code: int, command: str | None) -> None:
+        if self._on_key is not None:
+            self._on_key(code, command)
+        if command is None:
+            return
+        now = time.monotonic()
+        if command == self._last_command and now - self._last_command_at < 0.3:
+            return
+        self._last_command = command
+        self._last_command_at = now
+        self._on_command(command)
 
     def _read(self) -> None:
         try:
             for event in self.device.read_loop():
                 if self._stop.is_set():
                     return
-                if event.type != self._evdev.ecodes.EV_KEY or event.value != 1:
-                    continue
-                command = command_for_key(event.code)
-                if self._on_key is not None:
-                    self._on_key(event.code, command)
-                if command is not None:
-                    self._on_command(command)
+                if event.type == self._evdev.ecodes.EV_MSC and event.code == self._evdev.ecodes.MSC_SCAN:
+                    command = command_for_scancode(event.value)
+                    self._emit(event.value, command)
+                elif event.type == self._evdev.ecodes.EV_KEY and event.value == 1:
+                    command = command_for_key(event.code)
+                    self._emit(event.code, command)
         except OSError:
             if not self._stop.is_set():
                 raise

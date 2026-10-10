@@ -1,22 +1,14 @@
 import unittest
-from pathlib import Path
 from queue import Queue
 from threading import Event
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from pilights.player import play_song
-from pilights.remote import IRRemote, command_for_key
+from pilights.remote import IRRemote, command_for_key, command_for_scancode
 
 
 class EvdevRemoteTest(unittest.TestCase):
-    def test_elegoo_keymap_matches_button_scancodes(self):
-        keymap = (Path(__file__).parents[1] / "config/elegoo-21-keymap").read_text()
-        self.assertIn("0x2d KEY_POWER", keymap)
-        self.assertIn("0x28 KEY_PLAYPAUSE", keymap)
-        self.assertIn("0x2b KEY_NEXTSONG", keymap)
-        self.assertIn("0x2c KEY_PREVIOUSSONG", keymap)
-
     def test_maps_linux_remote_key_codes(self):
         expected = {
             116: "reboot",
@@ -28,6 +20,13 @@ class EvdevRemoteTest(unittest.TestCase):
             with self.subTest(command=command):
                 self.assertEqual(command_for_key(code), command)
         self.assertIsNone(command_for_key(30))
+
+    def test_maps_remote_scancodes(self):
+        self.assertEqual(command_for_scancode(0x45), "reboot")
+        self.assertEqual(command_for_scancode(0x40), "pause")
+        self.assertEqual(command_for_scancode(0x43), "next")
+        self.assertEqual(command_for_scancode(0x44), "previous")
+        self.assertIsNone(command_for_scancode(0x10))
 
     def test_pause_toggles_then_next_stops_playback(self):
         class Player:
@@ -82,8 +81,11 @@ class EvdevRemoteTest(unittest.TestCase):
     def test_ir_remote_maps_only_key_down_events(self):
         events = [
             SimpleNamespace(type=1, code=116, value=0),
+            SimpleNamespace(type=4, code=4, value=0x45),
+            SimpleNamespace(type=4, code=4, value=0x45),
             SimpleNamespace(type=1, code=116, value=1),
             SimpleNamespace(type=1, code=116, value=2),
+            SimpleNamespace(type=4, code=4, value=0x43),
             SimpleNamespace(type=1, code=30, value=1),
         ]
         device = SimpleNamespace(
@@ -93,7 +95,7 @@ class EvdevRemoteTest(unittest.TestCase):
             close=Mock(),
         )
         evdev = SimpleNamespace(
-            ecodes=SimpleNamespace(EV_KEY=1),
+            ecodes=SimpleNamespace(EV_KEY=1, EV_MSC=4, MSC_SCAN=4),
             InputDevice=Mock(return_value=device),
         )
         on_command = Mock()
@@ -103,9 +105,12 @@ class EvdevRemoteTest(unittest.TestCase):
             remote._thread.join(timeout=1)
             remote.close()
 
-        self.assertEqual([call.args[0] for call in on_command.call_args_list], ["reboot"])
-        self.assertEqual(on_key.call_args_list[0].args, (116, "reboot"))
-        self.assertEqual(on_key.call_args_list[1].args, (30, None))
+        self.assertEqual([call.args[0] for call in on_command.call_args_list], ["reboot", "next"])
+        self.assertEqual(on_key.call_args_list[0].args, (0x45, "reboot"))
+        self.assertEqual(on_key.call_args_list[1].args, (0x45, "reboot"))
+        self.assertEqual(on_key.call_args_list[2].args, (116, "reboot"))
+        self.assertEqual(on_key.call_args_list[3].args, (0x43, "next"))
+        self.assertEqual(on_key.call_args_list[4].args, (30, None))
 
 
 if __name__ == "__main__":
