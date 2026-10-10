@@ -87,7 +87,7 @@ class IRRemote:
             lgpio.gpiochip_close(self._chip)
             raise RuntimeError(f"cannot claim remote input on BCM pin {pin}: {lgpio.error_text(status)}")
         try:
-            self._callback = lgpio.callback(self._chip, pin, lgpio.EITHER_EDGE, self._edge)
+            self._callback = lgpio.callback(self._chip, pin, lgpio.BOTH_EDGES, self._edge)
         except Exception:
             lgpio.gpiochip_close(self._chip)
             raise

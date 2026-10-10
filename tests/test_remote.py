@@ -2,9 +2,10 @@ import unittest
 from queue import Queue
 from threading import Event
 from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 from pilights.player import play_song
-from pilights.remote import NECDecoder, command_for_code
+from pilights.remote import IRRemote, NECDecoder, command_for_code
 
 
 def decode_frame(logical_code):
@@ -93,6 +94,22 @@ class NECDecoderTest(unittest.TestCase):
         self.assertEqual(result, "next")
         self.assertEqual((player.pauses, player.resumes, player.stops), (1, 1, 1))
         self.assertTrue(all(mask == 0 for mask in output.masks))
+
+    def test_ir_remote_uses_lgpio_both_edges_constant(self):
+        lgpio = SimpleNamespace(
+            SET_PULL_UP=32,
+            BOTH_EDGES=3,
+            gpiochip_open=Mock(return_value=0),
+            gpio_claim_input=Mock(return_value=0),
+            callback=Mock(return_value=Mock()),
+            gpiochip_close=Mock(),
+        )
+        with patch.dict("sys.modules", {"lgpio": lgpio}):
+            remote = IRRemote(25, Mock())
+
+        lgpio.callback.assert_called_once_with(0, 25, lgpio.BOTH_EDGES, remote._edge)
+        remote.close()
+
 
 if __name__ == "__main__":
     unittest.main()
