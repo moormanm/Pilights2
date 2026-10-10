@@ -84,9 +84,37 @@ Close the window or push Ctrl+C to stop.
 
 ## ELEGOO remote
 
-Connect the ELEGOO IR receiver `OUT` pin to BCM GPIO 25, `GND` to ground, and
-`VCC` to 3.3 V. GPIO25 is not used by the default light outputs. Enable remote
-control with `--remote`:
+The remote uses Linux input events (`evdev`). Connect the IR receiver `OUT` pin
+to BCM GPIO 25 (physical pin 22), `GND` to ground, and `VCC` to 3.3 V. Add this
+line to `/boot/firmware/config.txt`, then reboot:
+
+```sh
+dtoverlay=gpio-ir,gpio_pin=25
+```
+
+Install Pi dependencies and the IR tools:
+
+```sh
+make install-pi
+sudo apt install ir-keytable
+```
+
+Copy the provided key map and load it:
+
+```sh
+sudo install -D -m 0644 config/elegoo-21-keymap /etc/rc_keymaps/elegoo-21-keymap
+sudo ir-keytable -c -p nec -w /etc/rc_keymaps/elegoo-21-keymap
+```
+
+The key map is active until reboot. Use `sudo ir-keytable -t` to check the
+remote and confirm that its scancodes match the map. If they differ, edit the
+map with the scancodes shown by that command, then load it again. Check the
+input device with `make remote-test`; if needed, select it with
+`make remote-test ARGS="--device /dev/input/event2"`.
+For automatic loading after reboot, configure the key map with the system's
+`rc_maps.cfg` rules.
+
+Enable control during playback with `--remote`:
 
 ```sh
 make play ARGS="--active-low --remote"
@@ -95,8 +123,8 @@ uv run pilights play song1.mp3 song2.mp3 --loop --remote
 
 Power reboots the Raspberry Pi, play/pause toggles playback, forward skips to
 the next song, and back goes to the previous song. Song navigation wraps at
-the ends of the playlist. Use `--remote-pin` to select a different BCM input
-pin. Do not select a pin used by a light output.
+the ends of the playlist. The service user must have permission to read the
+selected `/dev/input/event*` device.
 
 To test the receiver without controlling playback or rebooting, run:
 
@@ -104,10 +132,8 @@ To test the receiver without controlling playback or rebooting, run:
 make remote-test
 ```
 
-Press Power, Play/Pause, Forward, or Back. The program prints the detected
-button. Use `make remote-test ARGS="--pin 23"` to select a different BCM input pin.
-The test also prints each decoded NEC code. Use `make remote-test ARGS="--edges"`
-to print every GPIO edge if it does not decode a code.
+Press remote buttons. The program prints each Linux key event and the mapped
+action. Unknown keys are also printed for diagnosis.
 
 The power button needs permission to reboot without a password. For the
 `pi` account used by the systemd service below, configure the sudo rule with:
@@ -126,7 +152,7 @@ Useful `play` options:
 | Option | Function |
 |---|---|
 | `--remote` | Enable the ELEGOO infrared remote |
-| `--remote-pin 25` | BCM pin for the IR receiver (default 25) |
+| `--remote-device /dev/input/event2` | Select the Linux IR input device (default: find the GPIO IR device) |
 | `--pins 5,6,13,...` | Use different BCM pins (1 to 8 pins) |
 | `--offset-ms 120` | Delay the lights more, if the device does not report all of its latency (some Bluetooth speakers). A negative value makes the lights earlier. |
 | `--device 2` or `--device USB` | Select the audio output device, by number or part of the name. `uv run python -m sounddevice` shows the list. |

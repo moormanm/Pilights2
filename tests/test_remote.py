@@ -5,50 +5,21 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from pilights.player import play_song
-from pilights.remote import IRRemote, NECDecoder, command_for_code, logical_code
+from pilights.remote import IRRemote, command_for_key
 
 
-def decode_frame(logical_code):
-    code = int.from_bytes(logical_code.to_bytes(4, "big"), "little")
-    decoder = NECDecoder()
-    tick = 0
-    decoder.feed(0, tick)
-    tick += 9000
-    decoder.feed(1, tick)
-    tick += 4500
-    decoder.feed(0, tick)
-    for bit in range(32):
-        tick += 560
-        decoder.feed(1, tick)
-        tick += 1690 if code >> bit & 1 else 560
-        result = decoder.feed(0, tick)
-    return result
-
-
-class NECDecoderTest(unittest.TestCase):
-    def test_elegoo_button_codes(self):
+class EvdevRemoteTest(unittest.TestCase):
+    def test_maps_linux_remote_key_codes(self):
         expected = {
-            0x00FFA25D: "reboot",
-            0x00FF02FD: "pause",
-            0x00FFC23D: "next",
-            0x00FF22DD: "previous",
+            116: "reboot",
+            164: "pause",
+            163: "next",
+            165: "previous",
         }
         for code, command in expected.items():
             with self.subTest(command=command):
-                self.assertEqual(command_for_code(decode_frame(code)), command)
-
-    def test_ignores_noise_and_unmapped_codes(self):
-        decoder = NECDecoder()
-        decoder.feed(1, 0)
-        decoder.feed(0, 1000)
-        self.assertIsNone(command_for_code(0x12345678))
-        self.assertIsNone(command_for_code(decode_frame(0x00FF629D)))
-        self.assertIsNone(command_for_code(decode_frame(0x12FFA25D)))
-
-    def test_decodes_unknown_frames_for_diagnostics(self):
-        code = decode_frame(0x00FF629D)
-        self.assertEqual(logical_code(code), 0x00FF629D)
-        self.assertIsNone(command_for_code(code))
+                self.assertEqual(command_for_key(code), command)
+        self.assertIsNone(command_for_key(30))
 
     def test_pause_toggles_then_next_stops_playback(self):
         class Player:
@@ -100,20 +71,33 @@ class NECDecoderTest(unittest.TestCase):
         self.assertEqual((player.pauses, player.resumes, player.stops), (1, 1, 1))
         self.assertTrue(all(mask == 0 for mask in output.masks))
 
-    def test_ir_remote_uses_lgpio_both_edges_constant(self):
-        lgpio = SimpleNamespace(
-            SET_PULL_UP=32,
-            BOTH_EDGES=3,
-            gpiochip_open=Mock(return_value=0),
-            gpio_claim_input=Mock(return_value=0),
-            callback=Mock(return_value=Mock()),
-            gpiochip_close=Mock(),
+    def test_ir_remote_maps_only_key_down_events(self):
+        events = [
+            SimpleNamespace(type=1, code=116, value=0),
+            SimpleNamespace(type=1, code=116, value=1),
+            SimpleNamespace(type=1, code=116, value=2),
+            SimpleNamespace(type=1, code=30, value=1),
+        ]
+        device = SimpleNamespace(
+            path="/dev/input/event2",
+            name="gpio_ir_recv",
+            read_loop=lambda: iter(events),
+            close=Mock(),
         )
-        with patch.dict("sys.modules", {"lgpio": lgpio}):
-            remote = IRRemote(25, Mock())
+        evdev = SimpleNamespace(
+            ecodes=SimpleNamespace(EV_KEY=1),
+            InputDevice=Mock(return_value=device),
+        )
+        on_command = Mock()
+        on_key = Mock()
+        with patch.dict("sys.modules", {"evdev": evdev}):
+            remote = IRRemote(on_command, "/dev/input/event2", on_key)
+            remote._thread.join(timeout=1)
+            remote.close()
 
-        lgpio.callback.assert_called_once_with(0, 25, lgpio.BOTH_EDGES, remote._edge)
-        remote.close()
+        self.assertEqual([call.args[0] for call in on_command.call_args_list], ["reboot"])
+        self.assertEqual(on_key.call_args_list[0].args, (116, "reboot"))
+        self.assertEqual(on_key.call_args_list[1].args, (30, None))
 
 
 if __name__ == "__main__":

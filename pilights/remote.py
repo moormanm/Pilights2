@@ -1,121 +1,91 @@
-"""Read the common 21-key ELEGOO NEC infrared remote."""
+"""Read remote button presses from a Linux evdev input device."""
 
 from __future__ import annotations
 
-import time
+import threading
 
 
-REMOTE_COMMANDS = {
-    0x00FFA25D: "reboot",
-    0x00FF02FD: "pause",
-    0x00FFC23D: "next",
-    0x00FF22DD: "previous",
+KEY_COMMANDS = {
+    116: "reboot",       # KEY_POWER
+    164: "pause",        # KEY_PLAYPAUSE
+    163: "next",         # KEY_NEXTSONG
+    165: "previous",     # KEY_PREVIOUSSONG
+}
+
+KEY_NAMES = {
+    116: "KEY_POWER",
+    164: "KEY_PLAYPAUSE",
+    163: "KEY_NEXTSONG",
+    165: "KEY_PREVIOUSSONG",
 }
 
 
-def logical_code(code: int) -> int:
-    """Convert the decoder's least-significant-bit-first value to its displayed NEC code."""
-    return int.from_bytes(code.to_bytes(4, "little"), "big")
+def command_for_key(key_code: int) -> str | None:
+    """Map a Linux input key code to a playback command."""
+    return KEY_COMMANDS.get(key_code)
 
 
-def command_for_code(code: int) -> str | None:
-    """Map a decoded NEC frame to a playback command."""
-    return REMOTE_COMMANDS.get(logical_code(code))
+def find_remote_device():
+    """Find the GPIO infrared receiver input device by its kernel device name."""
+    try:
+        import evdev
+    except ImportError as e:
+        raise RuntimeError("remote input needs python-evdev; install with `make install-pi`") from e
 
-
-class NECDecoder:
-    """Decode 32-bit NEC frames from receiver edge levels and microsecond ticks."""
-
-    def __init__(self):
-        self._last_level = None
-        self._last_tick = None
-        self._active = False
-        self._bits = 0
-        self._count = 0
-
-    def feed(self, level: int, tick: int) -> int | None:
-        if self._last_tick is None:
-            self._last_level = level
-            self._last_tick = tick
-            return None
-
-        duration = (tick - self._last_tick) & 0xFFFFFFFF
-        falling = self._last_level == 1 and level == 0
-        self._last_level = level
-        self._last_tick = tick
-        if not falling:
-            return None
-
-        if 4000 <= duration <= 5000:
-            self._active = True
-            self._bits = 0
-            self._count = 0
-            return None
-        if not self._active:
-            return None
-        if 350 <= duration <= 800:
-            bit = 0
-        elif 1300 <= duration <= 2000:
-            bit = 1
-        else:
-            self._active = False
-            return None
-
-        self._bits |= bit << self._count
-        self._count += 1
-        if self._count != 32:
-            return None
-        self._active = False
-        return self._bits
+    devices = [evdev.InputDevice(path) for path in evdev.list_devices()]
+    matches = [device for device in devices if "gpio_ir_recv" in device.name.lower()]
+    if len(matches) == 1:
+        selected = matches[0]
+        for device in devices:
+            if device is not selected:
+                device.close()
+        return selected
+    if len(matches) > 1:
+        names = ", ".join(f"{device.path} ({device.name})" for device in matches)
+        for device in devices:
+            device.close()
+        raise RuntimeError(f"more than one GPIO IR input device found: {names}; choose one with --remote-device")
+    found = ", ".join(f"{device.path} ({device.name})" for device in devices) or "none"
+    for device in devices:
+        device.close()
+    raise RuntimeError(f"no GPIO IR input device found; available input devices: {found}")
 
 
 class IRRemote:
-    """Send decoded ELEGOO remote commands to a callback."""
+    """Read remote key-down events and send mapped commands to a callback."""
 
-    def __init__(self, pin: int, on_command, on_code=None, on_edge=None):
+    def __init__(self, on_command, device_path: str | None = None, on_key=None):
         try:
-            import lgpio
+            import evdev
         except ImportError as e:
-            raise RuntimeError("remote input needs lgpio; install with `make install-pi`") from e
+            raise RuntimeError("remote input needs python-evdev; install with `make install-pi`") from e
 
-        self._lgpio = lgpio
+        self._evdev = evdev
+        self.device = find_remote_device() if device_path is None else evdev.InputDevice(device_path)
         self._on_command = on_command
-        self._on_code = on_code
-        self._on_edge = on_edge
-        self._decoder = NECDecoder()
-        self._last_command = None
-        self._last_command_at = 0.0
-        self._chip = lgpio.gpiochip_open(0)
-        if self._chip < 0:
-            raise RuntimeError(f"cannot open GPIO chip 0: {lgpio.error_text(self._chip)}")
-        status = lgpio.gpio_claim_input(self._chip, pin, lgpio.SET_PULL_UP)
-        if status < 0:
-            lgpio.gpiochip_close(self._chip)
-            raise RuntimeError(f"cannot claim remote input on BCM pin {pin}: {lgpio.error_text(status)}")
-        try:
-            self._callback = lgpio.callback(self._chip, pin, lgpio.BOTH_EDGES, self._edge)
-        except Exception:
-            lgpio.gpiochip_close(self._chip)
-            raise
+        self._on_key = on_key
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._read, name="ir-remote", daemon=True)
+        self._thread.start()
 
-    def _edge(self, chip, gpio, level, tick) -> None:
-        if self._on_edge is not None:
-            self._on_edge(level, tick)
-        code = self._decoder.feed(level, tick)
-        if code is None:
-            return
-        command = command_for_code(code)
-        if self._on_code is not None:
-            self._on_code(logical_code(code), command)
-        if command is None:
-            return
-        now = time.monotonic()
-        if command == self._last_command and now - self._last_command_at < 0.3:
-            return
-        self._last_command = command
-        self._last_command_at = now
-        self._on_command(command)
+    def _read(self) -> None:
+        try:
+            for event in self.device.read_loop():
+                if self._stop.is_set():
+                    return
+                if event.type != self._evdev.ecodes.EV_KEY or event.value != 1:
+                    continue
+                command = command_for_key(event.code)
+                if self._on_key is not None:
+                    self._on_key(event.code, command)
+                if command is not None:
+                    self._on_command(command)
+        except OSError:
+            if not self._stop.is_set():
+                raise
 
     def close(self) -> None:
-        self._callback.cancel()
-        self._lgpio.gpiochip_close(self._chip)
+        self._stop.set()
+        self.device.close()
+        if threading.current_thread() is not self._thread:
+            self._thread.join(timeout=1)

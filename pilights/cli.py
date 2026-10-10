@@ -168,8 +168,6 @@ def cmd_play(args) -> int:
             return 2
         songs.append((audio, _check_sequence(audio, seq_path, len(args.pins))))
 
-    if args.remote and args.remote_pin in args.pins:
-        raise RuntimeError(f"remote pin {args.remote_pin} is also used for a light output")
     out = _make_output(args)
     if args.player == "mpg123":
         player = Mpg123(extra_args=args.mpg123_args.split() if args.mpg123_args else ())
@@ -181,7 +179,7 @@ def cmd_play(args) -> int:
         from .remote import IRRemote
 
         try:
-            remote = IRRemote(args.remote_pin, commands.put)
+            remote = IRRemote(commands.put, device_path=args.remote_device)
         except Exception:
             out.close()
             player.close()
@@ -317,7 +315,7 @@ def main(argv=None) -> int:
     p.add_argument("--device", help="portaudio output device, number or part of the name (see: python -m sounddevice)")
     p.add_argument("--mpg123-args", default="", help='extra mpg123 options, e.g. "-a hw:0,0"')
     p.add_argument("--remote", action="store_true", help="enable an ELEGOO NEC infrared remote")
-    p.add_argument("--remote-pin", type=int, default=25, help="BCM input pin for the remote receiver (default 25)")
+    p.add_argument("--remote-device", help="Linux input device for the IR receiver (default: detect GPIO IR device)")
     add_output_args(p)
     p.set_defaults(func=cmd_play)
 

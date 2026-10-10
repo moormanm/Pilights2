@@ -4,7 +4,7 @@
 import argparse
 import time
 
-from pilights.remote import IRRemote
+from pilights.remote import IRRemote, KEY_NAMES
 
 
 LABELS = {
@@ -17,28 +17,20 @@ LABELS = {
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--pin", type=int, default=25, help="BCM pin for the IR receiver (default 25)")
-    parser.add_argument("--edges", action="store_true", help="print every GPIO edge for signal troubleshooting")
+    parser.add_argument("--device", help="Linux input device, for example /dev/input/event2")
     args = parser.parse_args()
 
-    def show_code(code, command):
-        label = LABELS.get(command, "unknown button")
-        print(f"NEC code 0x{code:08X}: {label}", flush=True)
-
-    def show_edge(level, tick):
-        print(f"GPIO edge: level={level} tick={tick}", flush=True)
+    def show_key(code, command):
+        name = KEY_NAMES.get(code, f"KEY_{code}")
+        label = LABELS.get(command, "unknown key")
+        print(f"Detected {name}: {label}", flush=True)
 
     try:
-        remote = IRRemote(
-            args.pin,
-            lambda command: print(f"Detected: {LABELS[command]}", flush=True),
-            on_code=show_code,
-            on_edge=show_edge if args.edges else None,
-        )
+        remote = IRRemote(lambda command: None, device_path=args.device, on_key=show_key)
     except RuntimeError as error:
         parser.exit(1, f"error: {error}\n")
 
-    print("Press Power, Play/Pause, Forward, or Back. Press Ctrl+C to stop.")
+    print(f"Listening on {remote.device.path} ({remote.device.name}). Press buttons; Ctrl+C to stop.")
     try:
         while True:
             time.sleep(1)

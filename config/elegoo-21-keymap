@@ -1,0 +1,5 @@
+# table rc-pilights_elegoo, type: nec
+0x00ffa25d KEY_POWER
+0x00ff02fd KEY_PLAYPAUSE
+0x00ffc23d KEY_NEXTSONG
+0x00ff22dd KEY_PREVIOUSSONG
