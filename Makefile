@@ -4,7 +4,7 @@ BOOT_CONFIG ?= /boot/firmware/config.txt
 RUN := uv run --frozen pilights
 RUN_PI := uv run --frozen --extra pi pilights
 
-.PHONY: help install install-pi lock test analyze play gui wiring wiring-gui remote-config remote-setup remote-test remote-sudo clean
+.PHONY: help install install-pi lock test analyze play gui wiring wiring-gui remote-config remote-setup remote-test remote-sudo service-install clean
 
 help: ## Show this help
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-12s %s\n", $$1, $$2}'
@@ -63,6 +63,13 @@ remote-test: ## Test the ELEGOO remote buttons on the Pi
 remote-sudo: ## Allow the pi user to reboot from the ELEGOO remote
 	sudo install -o root -g root -m 0440 config/pilights-remote.sudoers /etc/sudoers.d/pilights-remote
 	sudo visudo -c
+
+service-install: ## Run pilights at boot as a service (waits for play/pause, watches examples/)
+	sed -e "s|@USER@|$$(id -un)|" -e "s|@DIR@|$(CURDIR)|g" -e "s|@UV@|$$(command -v uv)|" config/pilights.service | sudo tee /etc/systemd/system/pilights.service >/dev/null
+	sudo systemctl daemon-reload
+	sudo systemctl enable pilights.service
+	sudo systemctl restart pilights.service
+	@echo "Started. Logs: journalctl -u pilights -f"
 
 clean: ## Remove the virtual environment, caches and sequence files in examples/
 	rm -rf .venv build dist *.egg-info

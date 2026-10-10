@@ -1,0 +1,13 @@
+[Unit]
+Description=pilights Christmas light controller
+After=sound.target pilights-ir-keymap.service
+
+[Service]
+User=@USER@
+WorkingDirectory=@DIR@
+ExecStart=@UV@ run --frozen --extra pi pilights play --loop --active-low --remote --start-paused --watch @DIR@/examples
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

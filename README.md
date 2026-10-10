@@ -133,6 +133,18 @@ the next song, and back goes to the previous song. Song navigation wraps at
 the ends of the playlist. The service user must have permission to read the
 selected `/dev/input/event*` device.
 
+## Run as a service
+
+```sh
+make service-install
+```
+
+This starts pilights at boot as the `pilights` systemd service. It waits for
+the play/pause button, then plays and loops. It scans `examples/` every 5
+seconds and adds new MP3 files to the playlist. Remove `--active-low` in
+`config/pilights.service` for active-high relays. View logs with
+`journalctl -u pilights -f`. Stop it with `sudo systemctl stop pilights`.
+
 To test the receiver without controlling playback or rebooting, run:
 
 ```sh

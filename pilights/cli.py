@@ -156,7 +156,10 @@ def cmd_play(args) -> int:
     from .player import Mpg123, PortAudioPlayer, play_song
     from .sequence import default_sequence_path
 
-    audio_inputs = _audio_inputs(args.audio)
+    if not args.audio and not args.watch:
+        print("error: give audio files or --watch DIR", file=sys.stderr)
+        return 2
+    audio_inputs = _audio_inputs(args.audio) if args.audio else []
     if args.sequence and len(audio_inputs) > 1:
         print("error: -s can only be used with one input file", file=sys.stderr)
         return 2
@@ -167,6 +170,30 @@ def cmd_play(args) -> int:
             print(f"error: {audio} not found", file=sys.stderr)
             return 2
         songs.append((audio, _check_sequence(audio, seq_path, len(args.pins))))
+
+    sizes, bad = {}, set()
+
+    def scan_dir():
+        """Add new MP3 files from the watch directory once their size stops changing."""
+        known = {a for a, _ in songs}
+        for f in sorted(Path(args.watch).glob("*.mp3")):
+            name = str(f)
+            if name in known or name in bad:
+                continue
+            size = f.stat().st_size
+            if sizes.get(name) != size:
+                sizes[name] = size
+                continue
+            try:
+                songs.append((name, _check_sequence(name, default_sequence_path(name), len(args.pins))))
+                print(f"Added {name}", file=sys.stderr)
+            except Exception as e:
+                bad.add(name)
+                print(f"warning: skipping {name}: {e}", file=sys.stderr)
+
+    if args.watch:
+        scan_dir()
+        scan_dir()
 
     out = _make_output(args)
     if args.player == "mpg123":
@@ -186,8 +213,32 @@ def cmd_play(args) -> int:
             raise
 
     def work(stop):
+        import threading
+
+        if args.watch:
+            def watch_loop():
+                while not stop.wait(args.watch_interval):
+                    scan_dir()
+
+            threading.Thread(target=watch_loop, name="watch", daemon=True).start()
+        if args.start_paused:
+            print("Waiting for the play/pause button", file=sys.stderr)
+            while not stop.is_set():
+                try:
+                    first = commands.get(timeout=0.2)
+                except queue.Empty:
+                    continue
+                if first == "reboot":
+                    _reboot_system()
+                    return
+                if first == "pause":
+                    break
         index = 0
         while not stop.is_set():
+            if not songs:
+                stop.wait(1)
+                continue
+            index %= len(songs)
             audio, seq = songs[index]
             print(f"Playing {audio}", file=sys.stderr)
             command = play_song(player, audio, seq, out, offset_ms=args.offset_ms, stop=stop, commands=commands)
@@ -304,7 +355,7 @@ def main(argv=None) -> int:
         mode.add_argument("--gui", action="store_true", help="show channels in a desktop window, not GPIO")
 
     p = sub.add_parser("play", help="play MP3 files and run their sequences")
-    p.add_argument("audio", nargs="+")
+    p.add_argument("audio", nargs="*")
     p.add_argument("-s", "--sequence", help="sequence path (default: <song>.seq.json)")
     p.add_argument("--loop", action="store_true", help="repeat the playlist until stopped")
     p.add_argument("--gap", type=float, default=0.0, help="seconds of pause between songs")
@@ -315,6 +366,9 @@ def main(argv=None) -> int:
     p.add_argument("--device", help="portaudio output device, number or part of the name (see: python -m sounddevice)")
     p.add_argument("--mpg123-args", default="", help='extra mpg123 options, e.g. "-a hw:0,0"')
     p.add_argument("--remote", action="store_true", help="enable an ELEGOO NEC infrared remote")
+    p.add_argument("--watch", metavar="DIR", help="add new MP3 files from DIR to the playlist while running")
+    p.add_argument("--watch-interval", type=float, default=5.0, help="seconds between --watch scans (default %(default)s)")
+    p.add_argument("--start-paused", action="store_true", help="wait for the play/pause button before the first song")
     p.add_argument("--remote-device", help="Linux input device for the IR receiver (default: detect GPIO IR device)")
     add_output_args(p)
     p.set_defaults(func=cmd_play)
