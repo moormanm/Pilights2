@@ -105,11 +105,18 @@ different boot config path, set it:
 make remote-setup BOOT_CONFIG=/boot/config.txt
 ```
 
-Use `sudo ir-keytable -t` to check the remote and confirm that its scancodes
-match the map. If they differ, edit `config/elegoo-21-keymap` to use the
-scancodes shown by that command, then run `make remote-setup` again. Check
-button events with `make remote-test`; if needed, select the input device with
-`make remote-test ARGS="--device /dev/input/event2"`.
+On this Pi, the IR receiver is `rc1` (`rc0` is HDMI). Select `rc1` when you
+check the remote:
+
+```sh
+sudo ir-keytable -s rc1 -p nec -t
+```
+
+The `remote-setup` service loads the key map into `rc1` at boot. If the
+scancodes shown by `ir-keytable -s rc1 -t` differ from the entries in
+`config/elegoo-21-keymap`, update the map and run `make remote-setup` again.
+Check button events with `make remote-test`; if needed, select the input device
+with `make remote-test ARGS="--device /dev/input/event6"`.
 
 Enable control during playback with `--remote`:
 
