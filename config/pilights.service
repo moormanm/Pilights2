@@ -6,7 +6,7 @@ After=sound.target pilights-ir-keymap.service
 User=@USER@
 WorkingDirectory=@DIR@
 SupplementaryGroups=audio
-Environment=XDG_RUNTIME_DIR=/run/user/%U
+Environment=XDG_RUNTIME_DIR=/run/user/@UID@
 ExecStartPre=-/bin/sh -c '[ -z "@BT@" ] || { bluetoothctl connect @BT@; sleep 5; }'
 ExecStart=@UV@ run --frozen --extra pi pilights play --loop --active-low --remote --device pipewire --start-paused --watch @DIR@/examples
 Restart=on-failure
