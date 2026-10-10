@@ -4,7 +4,7 @@ After=systemd-udev-trigger.service
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/ir-keytable -s rc1 -c -p nec -w /etc/rc_keymaps/elegoo-21-keymap
+ExecStart=/usr/local/bin/pilights-ir-keymap
 RemainAfterExit=yes
 
 [Install]

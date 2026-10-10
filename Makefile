@@ -48,6 +48,7 @@ remote-config: ## Enable the GPIO IR receiver overlay in the Pi boot config
 remote-setup: install-pi remote-config remote-sudo ## Install and configure the ELEGOO IR receiver
 	sudo apt-get install -y ir-keytable
 	sudo install -D -o root -g root -m 0644 config/elegoo-21-keymap /etc/rc_keymaps/elegoo-21-keymap
+	sudo install -o root -g root -m 0755 config/pilights-ir-keymap.sh /usr/local/bin/pilights-ir-keymap
 	sudo install -o root -g root -m 0644 config/pilights-ir-keymap.service /etc/systemd/system/pilights-ir-keymap.service
 	sudo install -o root -g root -m 0644 config/70-pilights-ir.rules /etc/udev/rules.d/70-pilights-ir.rules
 	sudo usermod -aG input pi

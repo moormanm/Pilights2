@@ -106,16 +106,17 @@ different boot config path, set it:
 make remote-setup BOOT_CONFIG=/boot/config.txt
 ```
 
-On this Pi, the IR receiver is `rc1` (`rc0` is HDMI). Select `rc1` when you
-check the remote:
+The IR receiver number (`rc0`, `rc1`) changes between Pis. Setup finds it by
+its `gpio_ir_recv` name. To check the remote, replace `rcN` with the number
+that `sudo ir-keytable` shows for `gpio_ir_recv`:
 
 ```sh
-sudo ir-keytable -s rc1 -p nec -t
+sudo ir-keytable -s rcN -p nec -t
 ```
 
 The supplied map matches the scancodes on the ELEGOO remote tested here:
 Power `0x45`, Play/Pause `0x40`, Forward `0x43`, and Back `0x44`. The
-`remote-setup` service loads the map into `rc1` at boot. If your scancodes
+`remote-setup` service loads the map into the receiver at boot. If your scancodes
 differ, update `config/elegoo-21-keymap` and run `make remote-setup` again.
 Power is mapped to `KEY_PROG1`, not `KEY_POWER`, because systemd-logind
 powers off the Pi on `KEY_POWER`. Check button events with `make remote-test`; if needed, select the input device
