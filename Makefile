@@ -1,5 +1,6 @@
 SONGS ?= examples/*.mp3
 ARGS ?=
+BT_ADDR ?=
 BOOT_CONFIG ?= /boot/firmware/config.txt
 RUN := uv run --frozen pilights
 RUN_PI := uv run --frozen --extra pi pilights
@@ -66,7 +67,8 @@ remote-sudo: ## Allow the pi user to reboot from the ELEGOO remote
 	sudo visudo -c
 
 service-install: ## Run pilights at boot as a service (waits for play/pause, watches examples/)
-	sed -e "s|@USER@|$$(id -un)|" -e "s|@DIR@|$(CURDIR)|g" -e "s|@UV@|$$(command -v uv)|" config/pilights.service | sudo tee /etc/systemd/system/pilights.service >/dev/null
+	sed -e "s|@USER@|$$(id -un)|" -e "s|@DIR@|$(CURDIR)|g" -e "s|@BT@|$(BT_ADDR)|g" -e "s|@UV@|$$(command -v uv)|" config/pilights.service | sudo tee /etc/systemd/system/pilights.service >/dev/null
+	sudo loginctl enable-linger $$(id -un)
 	sudo systemctl daemon-reload
 	sudo systemctl enable pilights.service
 	sudo systemctl restart pilights.service
