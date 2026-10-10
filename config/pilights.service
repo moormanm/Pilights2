@@ -8,7 +8,7 @@ WorkingDirectory=@DIR@
 SupplementaryGroups=audio
 Environment=XDG_RUNTIME_DIR=/run/user/%U
 ExecStartPre=-/bin/sh -c '[ -z "@BT@" ] || { bluetoothctl connect @BT@; sleep 5; }'
-ExecStart=@UV@ run --frozen --extra pi pilights play --loop --active-low --remote --start-paused --watch @DIR@/examples
+ExecStart=@UV@ run --frozen --extra pi pilights play --loop --active-low --remote --device pipewire --start-paused --watch @DIR@/examples
 Restart=on-failure
 RestartSec=5
 
